@@ -1,0 +1,146 @@
+{
+  "checker/blob/ns": {
+    "psnr": 19.69,
+    "ssim": 0.7694
+  },
+  "checker/blob/patchmatch": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "checker/blob/telea": {
+    "psnr": 19.39,
+    "ssim": 0.7611
+  },
+  "checker/strokes/ns": {
+    "psnr": 24.18,
+    "ssim": 0.9511
+  },
+  "checker/strokes/patchmatch": {
+    "psnr": 25.11,
+    "ssim": 0.969
+  },
+  "checker/strokes/telea": {
+    "psnr": 24.55,
+    "ssim": 0.9555
+  },
+  "edges/blob/ns": {
+    "psnr": 24.46,
+    "ssim": 0.911
+  },
+  "edges/blob/patchmatch": {
+    "psnr": 25.07,
+    "ssim": 0.9191
+  },
+  "edges/blob/telea": {
+    "psnr": 24.97,
+    "ssim": 0.915
+  },
+  "edges/strokes/ns": {
+    "psnr": 23.47,
+    "ssim": 0.9747
+  },
+  "edges/strokes/patchmatch": {
+    "psnr": 24.41,
+    "ssim": 0.9805
+  },
+  "edges/strokes/telea": {
+    "psnr": 22.96,
+    "ssim": 0.9699
+  },
+  "flat/blob/ns": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "flat/blob/patchmatch": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "flat/blob/telea": {
+    "psnr": 48.54,
+    "ssim": 0.9929
+  },
+  "flat/strokes/ns": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "flat/strokes/patchmatch": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "flat/strokes/telea": {
+    "psnr": 48.67,
+    "ssim": 0.9977
+  },
+  "gradient/blob/ns": {
+    "psnr": 49.59,
+    "ssim": 0.9987
+  },
+  "gradient/blob/patchmatch": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "gradient/blob/telea": {
+    "psnr": 45.28,
+    "ssim": 0.992
+  },
+  "gradient/strokes/ns": {
+    "psnr": 54.9,
+    "ssim": 0.9995
+  },
+  "gradient/strokes/patchmatch": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "gradient/strokes/telea": {
+    "psnr": 47.96,
+    "ssim": 0.9974
+  },
+  "noise/blob/ns": {
+    "psnr": 34.7,
+    "ssim": 0.9753
+  },
+  "noise/blob/patchmatch": {
+    "psnr": 33.29,
+    "ssim": 0.972
+  },
+  "noise/blob/telea": {
+    "psnr": 34.72,
+    "ssim": 0.9718
+  },
+  "noise/strokes/ns": {
+    "psnr": 43.0,
+    "ssim": 0.9959
+  },
+  "noise/strokes/patchmatch": {
+    "psnr": 43.7,
+    "ssim": 0.9968
+  },
+  "noise/strokes/telea": {
+    "psnr": 41.34,
+    "ssim": 0.9937
+  },
+  "stripes/blob/ns": {
+    "psnr": 23.85,
+    "ssim": 0.8276
+  },
+  "stripes/blob/patchmatch": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "stripes/blob/telea": {
+    "psnr": 23.41,
+    "ssim": 0.809
+  },
+  "stripes/strokes/ns": {
+    "psnr": 41.32,
+    "ssim": 0.9979
+  },
+  "stripes/strokes/patchmatch": {
+    "psnr": 99.0,
+    "ssim": 1.0
+  },
+  "stripes/strokes/telea": {
+    "psnr": 35.1,
+    "ssim": 0.9912
+  }
+}
