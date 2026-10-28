@@ -150,7 +150,7 @@ def _pil_to_array(pil: PILImage.Image, notes: list[str]) -> Image:
     if mode.startswith("I;16"):
         return np.asarray(pil).astype(np.uint16)
     if mode == "I":
-        return np.clip(np.asarray(pil), 0, 65535).astype(np.uint16)
+        return np.asarray(np.clip(np.asarray(pil), 0, 65535), dtype=np.uint16)
     if mode in ("CMYK", "YCbCr", "LAB", "HSV"):
         notes.append(f"converted {mode} to RGB")
         return np.asarray(pil.convert("RGB"))
@@ -330,12 +330,12 @@ def _flatten_alpha(pixels: Image) -> Image:
     rgb = pixels[:, :, :3].astype(np.float32)
     a = pixels[:, :, 3:4].astype(np.float32) / 255.0
     flat = rgb * a + 255.0 * (1.0 - a)
-    return np.clip(np.rint(flat), 0, 255).astype(np.uint8)
+    return np.asarray(np.clip(np.rint(flat), 0, 255), dtype=np.uint8)
 
 
 def encode_image(
     pixels: Image,
-    options: ExportOptions = ExportOptions(),
+    options: ExportOptions | None = None,
     *,
     icc_profile: bytes | None = None,
     exif: bytes | None = None,
@@ -346,6 +346,7 @@ def encode_image(
     ``options.keep_icc`` is true (ICC). Lossy formats get warnings explaining
     what changed.
     """
+    options = options or ExportOptions()
     fmt = options.format
     if fmt not in EXPORT_FORMATS:
         raise ValueError(f"unsupported export format {fmt!r}")

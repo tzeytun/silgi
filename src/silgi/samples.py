@@ -33,13 +33,15 @@ def fbm(h: int, w: int, seed: int = 0, octaves: int = 5, base: int = 4) -> F32:
     for o in range(octaves):
         cells = base * (2**o)
         grid = rng.random((cells + 3, cells + 3), dtype=np.float32)
-        up = cv2.resize(grid, (w + 2 * w // cells, h + 2 * h // cells), interpolation=cv2.INTER_CUBIC)
+        up = cv2.resize(
+            grid, (w + 2 * w // cells, h + 2 * h // cells), interpolation=cv2.INTER_CUBIC
+        )
         oy, ox = h // cells, w // cells
         out += amp * up[oy : oy + h, ox : ox + w]
         total += amp
         amp *= 0.5
     out /= total
-    lo, hi = float(out.min()), float(out.max())
+    lo, hi = float(np.min(out)), float(np.max(out))
     return ((out - lo) / max(hi - lo, 1e-6)).astype(np.float32)
 
 
@@ -72,8 +74,12 @@ def scene(name: str, h: int = 256, w: int = 256, seed: int = 0) -> F32:
     return np.clip(img, 0, 1).astype(np.float32)
 
 
-def landscape(h: int = 900, w: int = 1350, seed: int = 7) -> F32:
-    """A calm, photo-like landscape: sky, sun, mountains, lake, meadow."""
+def landscape(h: int = 900, w: int = 1350, seed: int = 7, vary_layout: bool = False) -> F32:
+    """A calm, photo-like landscape: sky, sun, mountains, lake, meadow.
+
+    With ``vary_layout`` the horizon, lake and sun move with the seed, so a set
+    of images shares no common edges (needed for watermark estimation).
+    """
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     v = yy / h
     sky_top = np.array([0.36, 0.52, 0.74], np.float32)
@@ -88,7 +94,12 @@ def landscape(h: int = 900, w: int = 1350, seed: int = 7) -> F32:
     img = img * (1 - cmask[..., None] * 0.55) + np.float32(0.98) * cmask[..., None] * 0.55
 
     # sun with glow
-    sx, sy, sr = w * 0.68, h * 0.40, h * 0.055
+    lay = _rng(seed + 5)
+
+    def jitter(a: float) -> float:
+        return float(lay.uniform(-a, a)) if vary_layout else 0.0
+
+    sx, sy, sr = w * (0.68 + jitter(0.25)), h * (0.40 + jitter(0.08)), h * 0.055
     d = np.sqrt((xx - sx) ** 2 + (yy - sy) ** 2)
     glow = np.exp(-((d / (sr * 5)) ** 2))[..., None] * 0.35
     img = img + glow * np.array([1.0, 0.85, 0.6], np.float32)
@@ -97,7 +108,7 @@ def landscape(h: int = 900, w: int = 1350, seed: int = 7) -> F32:
 
     def ridge(seed_: int, base_y: float, amp: float) -> F32:
         n = fbm(1, w, seed=seed_, octaves=6, base=4)[0]
-        return (base_y - amp * n) * h
+        return np.asarray((base_y - amp * n) * h, dtype=np.float32)
 
     def layer(top: F32, color: npt.NDArray[np.float32], tex_seed: int, tex: float) -> None:
         nonlocal img
@@ -106,32 +117,46 @@ def landscape(h: int = 900, w: int = 1350, seed: int = 7) -> F32:
         col = color * (1 - tex + tex * 2 * shade)
         img = img * (1 - cover) + col * cover
 
-    layer(ridge(seed + 11, 0.52, 0.22), np.array([0.47, 0.50, 0.62], np.float32), seed + 12, 0.10)
-    layer(ridge(seed + 21, 0.58, 0.12), np.array([0.30, 0.36, 0.40], np.float32), seed + 22, 0.18)
+    layer(
+        ridge(seed + 11, 0.52 + jitter(0.06), 0.22),
+        np.array([0.47, 0.50, 0.62], np.float32),
+        seed + 12,
+        0.10,
+    )
+    layer(
+        ridge(seed + 21, 0.58 + jitter(0.05), 0.12),
+        np.array([0.30, 0.36, 0.40], np.float32),
+        seed + 22,
+        0.18,
+    )
 
     # lake with reflection and ripples
-    lake_top = int(h * 0.62)
-    lake_bot = int(h * 0.80)
+    lake_top = int(h * (0.62 + jitter(0.04)))
+    lake_bot = int(h * (0.80 + jitter(0.04)))
     mirror = img[2 * lake_top - lake_bot : lake_top][::-1].copy()
     rip = fbm(lake_bot - lake_top, w, seed=seed + 31, octaves=5, base=10)
-    ripple = (np.sin(np.arange(lake_bot - lake_top, dtype=np.float32)[:, None] * 0.9 + rip * 8) * 0.04)
+    ripple = (
+        np.sin(np.arange(lake_bot - lake_top, dtype=np.float32)[:, None] * 0.9 + rip * 8) * 0.04
+    )
     water = mirror * 0.72 + np.array([0.10, 0.18, 0.26], np.float32) * 0.28 + ripple[..., None]
     img[lake_top:lake_bot] = water
 
     # meadow
-    meadow_top = ridge(seed + 41, 0.83, 0.05)
+    meadow_top = ridge(seed + 41, 0.83 + jitter(0.03), 0.05)
     cover = np.clip(yy - meadow_top[None, :] + 0.5, 0, 1)[..., None]
     grass = fbm(h, w, seed=seed + 42, octaves=7, base=12)[..., None]
-    blades = (np.sin(xx * 1.7 + fbm(h, w, seed=seed + 43, octaves=3, base=20) * 30) * 0.5 + 0.5)
-    g = np.array([0.30, 0.42, 0.20], np.float32) * (0.75 + 0.5 * grass) * (
-        0.9 + 0.1 * blades[..., None]
+    blades = np.sin(xx * 1.7 + fbm(h, w, seed=seed + 43, octaves=3, base=20) * 30) * 0.5 + 0.5
+    g = (
+        np.array([0.30, 0.42, 0.20], np.float32)
+        * (0.75 + 0.5 * grass)
+        * (0.9 + 0.1 * blades[..., None])
     )
     g = g * (0.85 + 0.25 * (v[..., None] - 0.8))
     img = img * (1 - cover) + g * cover
 
     # fine film grain so patches are not perfectly flat
     grain = _rng(seed + 99).normal(0, 0.008, (h, w, 1)).astype(np.float32)
-    return np.clip(img + grain, 0, 1).astype(np.float32)
+    return np.asarray(np.clip(img + grain, 0, 1), dtype=np.float32)
 
 
 # ------------------------------------------------------------------ watermarks
@@ -182,7 +207,12 @@ def fake_logo(size: int = 160, opacity: float = 0.85) -> Watermark:
     c = s // 2
     cv2.circle(ring, (c, int(s * 0.40)), int(s * 0.30), 255, int(s * 0.07), cv2.LINE_AA)
     pts = np.array(
-        [[c, int(s * 0.22)], [int(s * 0.62), int(s * 0.40)], [c, int(s * 0.58)], [int(s * 0.38), int(s * 0.40)]],
+        [
+            [c, int(s * 0.22)],
+            [int(s * 0.62), int(s * 0.40)],
+            [c, int(s * 0.58)],
+            [int(s * 0.38), int(s * 0.40)],
+        ],
         np.int32,
     )
     cv2.fillConvexPoly(ring, pts, 255, cv2.LINE_AA)
@@ -234,7 +264,9 @@ def demo_image(h: int = 900, w: int = 1350, seed: int = 7) -> DemoImage:
     logo = fake_logo(int(h * 0.15), opacity=0.9)
     lh, lw = logo.alpha.shape
     logo_pos = (h - lh - int(h * 0.04), w - lw - int(h * 0.04))
-    caption = text_watermark("(c) sample photo", height_px=max(12, h // 45), opacity=0.95, thickness=2)
+    caption = text_watermark(
+        "(c) sample photo", height_px=max(12, h // 45), opacity=0.95, thickness=2
+    )
     out = composite(clean, text, *text_pos)
     out = composite(out, logo, *logo_pos)
     out = composite(out, caption, h - caption.alpha.shape[0] - int(h * 0.03), int(h * 0.04))
@@ -273,7 +305,7 @@ def write_samples(out_dir: str | Path) -> list[Path]:
     multi.mkdir(exist_ok=True)
     mark = text_watermark("SAMPLE", height_px=70, opacity=0.5)
     for i in range(12):
-        bg = landscape(360, 540, seed=100 + i)
+        bg = landscape(360, 540, seed=100 + i, vary_layout=True)
         img = composite(bg, mark, 140, 120)
         p = multi / f"photo-{i:02d}.png"
         PILImage.fromarray(to_uint8(img)).save(p)

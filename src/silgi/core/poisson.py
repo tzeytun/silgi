@@ -24,9 +24,21 @@ from ._types import BoolMask, FloatImage
 DIRECT_LIMIT = 250_000
 
 
-def blend(target: FloatImage, guide: FloatImage, mask: BoolMask) -> FloatImage:
+def blend(
+    target: FloatImage,
+    guide: FloatImage,
+    mask: BoolMask,
+    *,
+    boundary_gradients: bool = True,
+) -> FloatImage:
     """Return ``target`` with Ω (= ``mask``) replaced by the Poisson solution
-    guided by ``guide``'s gradients."""
+    guided by ``guide``'s gradients.
+
+    With ``boundary_gradients`` the guide must be meaningful just outside Ω
+    too (seamless cloning of a shifted source). Without it only gradients
+    inside Ω are used, so a fill that exists only inside Ω adapts smoothly to
+    the boundary (seam removal).
+    """
     if target.shape != guide.shape or target.shape[:2] != mask.shape:
         raise ValueError("target, guide and mask must have matching shapes")
     h, w, c = target.shape
@@ -53,9 +65,11 @@ def blend(target: FloatImage, guide: FloatImage, mask: BoolMask) -> FloatImage:
         p = np.flatnonzero(inside)
         qy, qx = ny[p], nx[p]
         diag[p] += 1.0
-        b[p] += g[ys[p], xs[p]] - g[qy, qx]
         q_idx = index[qy, qx]
         in_omega = q_idx >= 0
+        guided = p if boundary_gradients else p[in_omega]
+        gq = (qy, qx) if boundary_gradients else (qy[in_omega], qx[in_omega])
+        b[guided] += g[ys[guided], xs[guided]] - g[gq]
         rows.append(p[in_omega])
         cols.append(q_idx[in_omega])
         boundary = p[~in_omega]
