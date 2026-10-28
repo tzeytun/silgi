@@ -59,7 +59,7 @@ class Estimate:
 
     def rgba8(self) -> npt.NDArray[np.uint8]:
         rgba = np.dstack([self.rgb, self.alpha])
-        return np.clip(np.rint(rgba * 255), 0, 255).astype(np.uint8)
+        return np.asarray(np.clip(np.rint(rgba * 255), 0, 255), dtype=np.uint8)
 
 
 def _rgb(image: Image) -> FloatImage:

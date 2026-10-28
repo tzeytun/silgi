@@ -57,7 +57,7 @@ def from_float(image: FloatImage, dtype: npt.DTypeLike) -> Image:
         return np.clip(image, 0.0, 1.0).astype(dt)
     scale = np.float32(max_value(dt))
     out = np.clip(np.rint(image * scale), 0, scale)
-    return out.astype(dt)
+    return np.asarray(out, dtype=dt)
 
 
 def to_8bit(image: Image) -> npt.NDArray[np.uint8]:

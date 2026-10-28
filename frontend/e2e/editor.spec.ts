@@ -32,6 +32,7 @@ test('open sample, brush, remove, compare and export', async ({ page }) => {
   await page.getByTestId('remove').click()
   await expect(page.getByTestId('job-bar')).toBeVisible()
   await expect(page.getByTestId('job-bar')).toBeHidden({ timeout: 60_000 })
+  await expect(page.getByTestId('toast')).toHaveCount(0) // shows the error text if the job failed
   await expect(page.getByTestId('history')).toContainText('PatchMatch')
   await expect(page.getByTestId('decision')).toContainText('PatchMatch')
 
@@ -64,6 +65,7 @@ test('reverse alpha removes a known watermark without a selection', async ({ pag
   await page.getByLabel('SAMPLE text').check()
   await page.getByTestId('remove').click()
   await expect(page.getByTestId('job-bar')).toBeHidden({ timeout: 60_000 })
+  await expect(page.getByTestId('toast')).toHaveCount(0)
   await expect(page.getByTestId('history')).toContainText('Reverse alpha')
 })
 

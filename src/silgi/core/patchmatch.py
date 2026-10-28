@@ -267,7 +267,8 @@ def _down2(level: _Level) -> _Level:
     kb = known.reshape(hh, 2, ww, 2).sum(axis=(1, 3))
     vb = (im * known[..., None]).reshape(hh, 2, ww, 2, c).sum(axis=(1, 3))
     out = np.where(kb[..., None] > 0, vb / np.maximum(kb, 1)[..., None], 0.0).astype(np.float32)
-    return _Level(out, kb < 4, srcp.reshape(hh, 2, ww, 2).any(axis=(1, 3)))
+    coarse_src = np.asarray(srcp.reshape(hh, 2, ww, 2).any(axis=(1, 3)), dtype=bool)
+    return _Level(out, kb < 4, coarse_src)
 
 
 def _valid_sources(level: _Level, r: int) -> BoolMask:
@@ -363,8 +364,8 @@ def fill(
 
     # coarsest initialisation by diffusion
     top = levels[-1]
-    img = diffusion.fill(top.img, top.hole, method="telea", radius=3.0)
-    nnf_y = np.full(top.hole.shape, -1, np.int32)
+    nnf_y: npt.NDArray[np.int32] = np.full(top.hole.shape, -1, np.int32)
+    nnf_x: npt.NDArray[np.int32] = np.full(top.hole.shape, -1, np.int32)
     nnf_x = np.full(top.hole.shape, -1, np.int32)
 
     for li in range(n_levels - 1, -1, -1):
