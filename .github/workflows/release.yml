@@ -46,7 +46,7 @@ jobs:
           names = zipfile.ZipFile(wheel).namelist()
           assert any(n.endswith("silgi/web/index.html") for n in names), "web/index.html missing from wheel"
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist
