@@ -343,3 +343,29 @@ def test_frontend_fallback(client: TestClient) -> None:
     r = client.get("/")
     assert r.status_code == 200
     assert "silgi" in r.text
+
+
+def test_mask_morph(client: TestClient) -> None:
+    m = np.zeros((40, 50), bool)
+    m[15:25, 20:30] = True
+    files = {"mask": ("m.png", mask_to_png(m), "image/png")}
+    for op, check in (
+        ("grow", lambda a: a.sum() > m.sum()),
+        ("shrink", lambda a: 0 < a.sum() < m.sum()),
+    ):
+        r = client.post("/api/mask/morph", data={"op": op, "px": "2"}, files=files)
+        assert r.status_code == 200
+        assert check(_mask_from(r, (40, 50))), op
+    r = client.post("/api/mask/morph", data={"op": "feather", "px": "3"}, files=files)
+    assert r.status_code == 200
+    assert (
+        client.post("/api/mask/morph", data={"op": "smooth", "px": "2"}, files=files).status_code
+        == 200
+    )
+    assert (
+        client.post("/api/mask/morph", data={"op": "x", "px": "2"}, files=files).status_code == 400
+    )
+    bad = {"mask": ("m.png", b"nope", "image/png")}
+    assert (
+        client.post("/api/mask/morph", data={"op": "grow", "px": "2"}, files=bad).status_code == 400
+    )
