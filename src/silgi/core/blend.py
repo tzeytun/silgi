@@ -23,7 +23,7 @@ def inward_ramp(mask: BoolMask, radius: float) -> npt.NDArray[np.float32]:
     if radius <= 0:
         return mask.astype(np.float32)
     dist = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 5)
-    return np.clip(dist / np.float32(radius + 1.0), 0.0, 1.0).astype(np.float32)
+    return np.asarray(np.clip(dist / np.float32(radius + 1.0), 0.0, 1.0), dtype=np.float32)
 
 
 def feather(original: FloatImage, filled: FloatImage, mask: BoolMask, radius: float) -> FloatImage:
@@ -35,7 +35,7 @@ def feather(original: FloatImage, filled: FloatImage, mask: BoolMask, radius: fl
 def seam(original: FloatImage, filled: FloatImage, mask: BoolMask) -> FloatImage:
     """Re-solve the fill in the gradient domain so it meets the surroundings
     without a visible step in brightness or colour."""
-    return poisson.blend(original, filled, mask)
+    return poisson.blend(original, filled, mask, boundary_gradients=False)
 
 
 def finish(

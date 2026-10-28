@@ -22,7 +22,9 @@ DiffusionMethod = Literal["telea", "ns"]
 _FLAGS = {"telea": cv2.INPAINT_TELEA, "ns": cv2.INPAINT_NS}
 
 
-def fill(roi: FloatImage, mask: BoolMask, *, method: DiffusionMethod = "telea", radius: float = 3.0) -> FloatImage:
+def fill(
+    roi: FloatImage, mask: BoolMask, *, method: DiffusionMethod = "telea", radius: float = 3.0
+) -> FloatImage:
     """Inpaint ``mask`` inside a float ROI. Works per channel in float32 so
     16-bit and alpha channels are handled exactly like 8-bit RGB."""
     if method not in _FLAGS:

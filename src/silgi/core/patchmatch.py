@@ -274,7 +274,9 @@ def _valid_sources(level: _Level, r: int) -> BoolMask:
     h, w = level.hole.shape
     k = 2 * r + 1
     known = (~level.hole).astype(np.uint8)
-    full = cv2.erode(known, np.ones((k, k), np.uint8), borderType=cv2.BORDER_CONSTANT, borderValue=0)
+    full = cv2.erode(
+        known, np.ones((k, k), np.uint8), borderType=cv2.BORDER_CONSTANT, borderValue=0
+    )
     valid = full.astype(bool) & level.src
     valid[:r] = False
     valid[h - r :] = False
@@ -294,7 +296,7 @@ def _active_centres(level: _Level, r: int) -> BoolMask:
 
 def _hole_thickness(hole: BoolMask) -> float:
     d = cv2.distanceTransform(np.pad(hole, 1).astype(np.uint8), cv2.DIST_L2, 5)
-    return 2.0 * float(d.max())
+    return 2.0 * float(np.max(d))
 
 
 def _build_pyramid(base: _Level, r: int) -> list[_Level]:
@@ -312,7 +314,9 @@ def _build_pyramid(base: _Level, r: int) -> list[_Level]:
 # ------------------------------------------------------------------- driver
 
 
-def _coords(mask: BoolMask, parity: int | None = None) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
+def _coords(
+    mask: BoolMask, parity: int | None = None
+) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
     ys, xs = np.nonzero(mask)
     if parity is not None:
         sel = ((ys + xs) & 1) == parity
@@ -381,7 +385,9 @@ def fill(
             _random_init(ay, ax, vy.astype(np.int32), vx.astype(np.int32), new_y, new_x, seed)
         else:
             # carry the coarse solution up: image by interpolation, NNF by doubling
-            up = cv2.resize(img, (img.shape[1] * 2, img.shape[0] * 2), interpolation=cv2.INTER_LINEAR)
+            up = cv2.resize(
+                img, (img.shape[1] * 2, img.shape[0] * 2), interpolation=cv2.INTER_LINEAR
+            )
             if up.ndim == 2:
                 up = up[..., None]
             fine = lv.img.copy()
@@ -390,7 +396,16 @@ def fill(
             new_y = np.full((h, w), -1, np.int32)
             new_x = np.full((h, w), -1, np.int32)
             _upsample_nnf(
-                ay, ax, nnf_y, nnf_x, valid, vy.astype(np.int32), vx.astype(np.int32), new_y, new_x, seed
+                ay,
+                ax,
+                nnf_y,
+                nnf_x,
+                valid,
+                vy.astype(np.int32),
+                vx.astype(np.int32),
+                new_y,
+                new_x,
+                seed,
             )
         nnf_y, nnf_x = new_y, new_x
         img = np.ascontiguousarray(img, dtype=np.float32)

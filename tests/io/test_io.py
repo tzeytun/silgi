@@ -9,9 +9,9 @@ from PIL import Image, ImageCms, ImageOps
 
 from silgi.core.color import to_display_rgb8
 from silgi.core.io import (
-    _pil_to_array,
     ExportOptions,
     UnsupportedImageError,
+    _pil_to_array,
     apply_orientation,
     encode_image,
     format_from_path,
@@ -61,7 +61,9 @@ def test_webp_gray_and_lossy(rng: np.random.Generator) -> None:
     gray = make_image(rng, 20, 20, 1)
     back = read_image(encode_image(gray, ExportOptions(format="webp")).data)
     assert back.pixels.shape == (20, 20, 3)
-    lossy = encode_image(make_image(rng, 20, 20, 3), ExportOptions(format="webp", webp_lossless=False))
+    lossy = encode_image(
+        make_image(rng, 20, 20, 3), ExportOptions(format="webp", webp_lossless=False)
+    )
     assert not lossy.lossless
     assert any("lossy" in w for w in lossy.warnings)
 
@@ -103,7 +105,9 @@ def test_metadata_off_by_default_and_orientation_reset() -> None:
     src = read_image(buf.getvalue())
     assert src.pixels.shape == (20, 10, 3)
 
-    stripped = read_image(encode_image(src.pixels, ExportOptions(), icc_profile=src.icc_profile, exif=src.exif).data)
+    stripped = read_image(
+        encode_image(src.pixels, ExportOptions(), icc_profile=src.icc_profile, exif=src.exif).data
+    )
     assert stripped.exif is None
     assert stripped.icc_profile == ICC
 
@@ -130,7 +134,9 @@ def test_metadata_off_by_default_and_orientation_reset() -> None:
 
 def test_tiff_warns_about_exif() -> None:
     enc = encode_image(
-        np.zeros((4, 4, 3), np.uint8), ExportOptions(format="tiff", keep_metadata=True), exif=_exif(1)
+        np.zeros((4, 4, 3), np.uint8),
+        ExportOptions(format="tiff", keep_metadata=True),
+        exif=_exif(1),
     )
     assert any("EXIF" in w for w in enc.warnings)
 

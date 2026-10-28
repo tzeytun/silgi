@@ -64,7 +64,7 @@ def to_8bit(image: Image) -> npt.NDArray[np.uint8]:
     """Reduce any supported image to 8 bits per channel (rounded, not truncated)."""
     if image.dtype == np.uint8:
         return image
-    return from_float(to_float(image).reshape(image.shape), np.uint8)  # type: ignore[no-any-return]
+    return from_float(to_float(image).reshape(image.shape), np.uint8)
 
 
 def luminance(image: FloatImage) -> npt.NDArray[np.float32]:
@@ -73,7 +73,7 @@ def luminance(image: FloatImage) -> npt.NDArray[np.float32]:
     if c < 3:
         return image[:, :, 0].copy()
     lum = 0.2126 * image[:, :, 0] + 0.7152 * image[:, :, 1] + 0.0722 * image[:, :, 2]
-    return lum.astype(np.float32)
+    return np.asarray(lum, dtype=np.float32)
 
 
 _SRGB = ImageCms.createProfile("sRGB")
