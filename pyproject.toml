@@ -87,6 +87,7 @@ include = [
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,localhost,::1"
 markers = ["slow: long-running quality tests"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]
 
 [tool.coverage.run]
 source = ["silgi"]
@@ -113,6 +114,7 @@ ignore = ["N803", "N806", "N818", "E741", "RUF002", "RUF003"]
 python_version = "3.11"
 mypy_path = "src"
 packages = ["silgi"]
+plugins = ["pydantic.mypy"]
 warn_unused_ignores = true
 warn_redundant_casts = true
 ignore_missing_imports = true
@@ -120,3 +122,6 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "silgi.core.*"
 strict = true
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.File", "fastapi.Form", "fastapi.Depends", "fastapi.Query"]

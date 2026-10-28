@@ -42,21 +42,8 @@ def _iou(a: Hit, b: Hit) -> float:
     return inter / union if union else 0.0
 
 
-def find_similar(
-    image: Image,
-    box: tuple[int, int, int, int],
-    *,
-    scales: Sequence[float] = DEFAULT_SCALES,
-    threshold: float = 0.6,
-    max_results: int = 100,
-) -> list[Hit]:
-    """Find copies of the region ``box`` = (x, y, w, h). Best matches first.
-
-    The source region itself is included, flagged with ``is_source``.
-    """
-    bx, by, bw, bh = box
-    if bw < 4 or bh < 4:
-        raise ValueError("select an area of at least 4x4 pixels")
+def _gradients(image: Image) -> tuple[npt.NDArray[np.float32], float]:
+    """Gradient magnitude of the (possibly downscaled) luminance, and the scale used."""
     lum = luminance(to_float(image))
     h0, w0 = lum.shape
     f = min(1.0, MAX_SIDE / max(h0, w0))
@@ -65,13 +52,18 @@ def find_similar(
             cv2.resize(lum, (round(w0 * f), round(h0 * f)), interpolation=cv2.INTER_AREA),
             dtype=np.float32,
         )
-    grad = gradient_magnitude(np.ascontiguousarray(lum))
-    tx, ty = round(bx * f), round(by * f)
-    tw, th = max(3, round(bw * f)), max(3, round(bh * f))
-    template = grad[ty : ty + th, tx : tx + tw]
-    if template.size == 0 or float(template.std()) == 0.0:
-        raise ValueError("the selected area has no detail to match")
+    return gradient_magnitude(np.ascontiguousarray(lum)), f
 
+
+def _search(
+    grad: npt.NDArray[np.float32],
+    template: npt.NDArray[np.float32],
+    f: float,
+    scales: Sequence[float],
+    threshold: float,
+    max_results: int,
+    source: tuple[int, int, int, int] | None = None,
+) -> list[Hit]:
     hits: list[Hit] = []
     for s in scales:
         t = (
@@ -107,17 +99,69 @@ def find_similar(
 
     hits.sort(key=lambda h: -h.score)
     kept: list[Hit] = []
-    src = Hit(bx, by, bw, bh, 1.0, 1.0)
+    src = Hit(*source, 1.0, 1.0) if source else None
     for hit in hits:
         if all(_iou(hit, k) < 0.3 for k in kept):
-            kept.append(
-                Hit(
-                    hit.x, hit.y, hit.w, hit.h, hit.score, hit.scale, is_source=_iou(hit, src) > 0.5
-                )
-            )
+            is_src = src is not None and _iou(hit, src) > 0.5
+            kept.append(Hit(hit.x, hit.y, hit.w, hit.h, hit.score, hit.scale, is_source=is_src))
         if len(kept) >= max_results:
             break
     return kept
+
+
+def find_similar(
+    image: Image,
+    box: tuple[int, int, int, int],
+    *,
+    scales: Sequence[float] = DEFAULT_SCALES,
+    threshold: float = 0.6,
+    max_results: int = 100,
+) -> list[Hit]:
+    """Find copies of the region ``box`` = (x, y, w, h). Best matches first.
+
+    The source region itself is included, flagged with ``is_source``.
+    """
+    bx, by, bw, bh = box
+    if bw < 4 or bh < 4:
+        raise ValueError("select an area of at least 4x4 pixels")
+    grad, f = _gradients(image)
+    tx, ty = round(bx * f), round(by * f)
+    tw, th = max(3, round(bw * f)), max(3, round(bh * f))
+    template = grad[ty : ty + th, tx : tx + tw]
+    if template.size == 0 or float(template.std()) == 0.0:
+        raise ValueError("the selected area has no detail to match")
+    return _search(grad, template, f, scales, threshold, max_results, source=box)
+
+
+def match_template(
+    image: Image,
+    template: Image,
+    *,
+    scales: Sequence[float] = DEFAULT_SCALES,
+    threshold: float = 0.6,
+    max_results: int = 100,
+) -> list[Hit]:
+    """Find occurrences of a separate template image (e.g. a logo file) in ``image``."""
+    grad, f = _gradients(image)
+    tmpl = to_float(template)
+    if tmpl.shape[2] in (2, 4):
+        # composite a transparent logo over mid-grey so its outline carries the edges
+        a = tmpl[:, :, -1:]
+        tmpl = tmpl[:, :, :-1] * a + 0.5 * (1 - a)
+    tl = luminance(np.ascontiguousarray(tmpl, dtype=np.float32))
+    if f < 1.0:
+        tl = np.asarray(
+            cv2.resize(
+                tl,
+                (max(3, round(tl.shape[1] * f)), max(3, round(tl.shape[0] * f))),
+                interpolation=cv2.INTER_AREA,
+            ),
+            dtype=np.float32,
+        )
+    tgrad = gradient_magnitude(np.ascontiguousarray(tl))
+    if float(tgrad.std()) == 0.0:
+        raise ValueError("the template has no detail to match")
+    return _search(grad, tgrad, f, scales, threshold, max_results)
 
 
 def hits_to_mask(
