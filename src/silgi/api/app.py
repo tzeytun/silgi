@@ -31,7 +31,7 @@ from silgi.core.progress import Progress
 from silgi.core.roi import mask_bbox
 from silgi.core.select import color_range, find_similar, find_text, magic_wand
 from silgi.core.select.colorrange import sample_color
-from silgi.core.select.morph import mask_to_png
+from silgi.core.select.morph import feather, grow, mask_to_png, shrink, smooth
 
 from .jobs import JobManager
 from .schemas import (
@@ -283,6 +283,33 @@ def create_app() -> FastAPI:
                 for h in hits
             ]
         }
+
+    @app.post("/api/mask/morph")
+    async def morph(
+        op: str = Form(...), px: float = Form(...), mask: UploadFile = File(...)
+    ) -> Response:
+        """Grow, shrink, smooth or feather a mask PNG (any size; alpha or gray)."""
+        data = await mask.read()
+        try:
+            pil = PILImage.open(io.BytesIO(data))
+            chan = (
+                pil.convert("RGBA").split()[3] if pil.mode in ("RGBA", "LA") else pil.convert("L")
+            )
+        except OSError as exc:
+            raise HTTPException(400, f"mask is not a valid image: {exc}") from exc
+        arr = np.asarray(chan) >= 128
+        n = round(px)
+        if op == "grow":
+            out: npt.NDArray[Any] = await run_in_threadpool(grow, arr, n)
+        elif op == "shrink":
+            out = await run_in_threadpool(shrink, arr, n)
+        elif op == "smooth":
+            out = await run_in_threadpool(smooth, arr, n)
+        elif op == "feather":
+            out = await run_in_threadpool(feather, arr, px)
+        else:
+            raise HTTPException(400, f"unknown operation {op!r}")
+        return _mask_response(out)
 
     # ------------------------------------------------------------------ watermarks
 
