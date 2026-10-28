@@ -1,0 +1,72 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please do not attach images you do not have the right to share; a small synthetic example is ideal (`python scripts/make_samples.py` creates CC0 ones).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Select ... with the ... tool
+        3. Click Remove with method ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did it happen?
+      options:
+        - Web interface
+        - CLI (silgi remove / silgi batch)
+        - Python library (silgi.core)
+    validations:
+      required: true
+  - type: dropdown
+    id: method
+    attributes:
+      label: Removal method involved
+      options:
+        - Not applicable
+        - Auto
+        - Reverse alpha
+        - PatchMatch
+        - Fast marching / Navier-Stokes
+        - Clone / Heal
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: silgi version
+      description: Output of `silgi --version`
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Operating system, Python version and browser
+      placeholder: Windows 11, Python 3.12, Firefox 130
+    validations:
+      required: true
+  - type: textarea
+    id: image
+    attributes:
+      label: Image details
+      description: Format, size in pixels, bit depth, alpha or ICC profile, if relevant.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output
+      render: shell

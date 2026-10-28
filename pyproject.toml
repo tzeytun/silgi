@@ -70,9 +70,13 @@ Changelog = "https://github.com/tzeytun/silgi/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/silgi"]
-artifacts = ["src/silgi/web/**"]
+
+# The built frontend is git-ignored, so it must be forced into the wheel.
+[tool.hatch.build.targets.wheel.force-include]
+"src/silgi/web" = "silgi/web"
 
 [tool.hatch.build.targets.sdist]
+artifacts = ["src/silgi/web/**"]
 include = [
   "src/silgi",
   "tests",
@@ -102,6 +106,7 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedE
 line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
+extend-exclude = ["frontend", "src/silgi/web"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF", "NPY", "PT"]

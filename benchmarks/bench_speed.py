@@ -11,6 +11,7 @@ image size: a logo-sized blob (about 1 % of the image) and a large one (5 %).
 from __future__ import annotations
 
 import argparse
+import os
 import platform
 import time
 
@@ -18,7 +19,7 @@ import cv2
 import numpy as np
 
 from silgi.core import engine
-from silgi.samples import fbm, text_watermark, composite
+from silgi.samples import composite, fbm, text_watermark
 
 SIZES = {"2 MP": (1200, 1700), "12 MP": (3000, 4000), "24 MP": (4000, 6000)}
 MASKS = {"1 %": 0.01, "5 %": 0.05}
@@ -48,9 +49,9 @@ def make_mask(h: int, w: int, frac: float) -> np.ndarray:
     return m.astype(bool)
 
 
-def timed(fn) -> float:
+def timed(*args: object, **kwargs: object) -> float:
     t = time.perf_counter()
-    fn()
+    engine.remove(*args, **kwargs)  # type: ignore[arg-type]
     return time.perf_counter() - t
 
 
@@ -70,31 +71,40 @@ def main() -> None:
     sizes = {"2 MP": SIZES["2 MP"]} if args.quick else SIZES
     for size_name, (h, w) in sizes.items():
         img = make_image(h, w)
-        wm_img = (composite(img.astype(np.float32) / 255, mark, h // 2, w // 2) * 255).astype(np.uint8)
+        wm_img = (composite(img.astype(np.float32) / 255, mark, h // 2, w // 2) * 255).astype(
+            np.uint8
+        )
         for mask_name, frac in MASKS.items():
             mask = make_mask(h, w, frac)
-            ys, xs = np.nonzero(mask)
+            xs = np.nonzero(mask)[1]
             for name, opts in METHODS:
                 kwargs = {k: v for k, v in opts.items() if k != "offset_frac"}
                 if name == "alpha (reverse blend)":
                     if frac != MASKS["1 %"]:
                         rows[name][f"{size_name} / {mask_name}"] = "n/a"
                         continue
-                    secs = timed(lambda: engine.remove(wm_img, mask, "alpha", watermark=mark, watermark_position=(h // 2, w // 2)))
+                    secs = timed(
+                        wm_img,
+                        mask,
+                        "alpha",
+                        watermark=mark,
+                        watermark_position=(h // 2, w // 2),
+                    )
                 elif opts.get("offset_frac"):
                     off = (0, int(xs.max() - xs.min()) + 4)
                     if xs.max() + off[1] >= w:
                         off = (0, -off[1])
-                    secs = timed(lambda: engine.remove(img, mask, "heal", offset=off))
+                    secs = timed(img, mask, "heal", offset=off)
                 else:
                     method = name.split()[0]
-                    secs = timed(lambda: engine.remove(img, mask, method, **kwargs))
+                    secs = timed(img, mask, method, **kwargs)
                 rows[name][f"{size_name} / {mask_name}"] = f"{secs:.2f} s"
                 print(f"{name:24s} {size_name:6s} mask {mask_name}: {secs:6.2f} s", flush=True)
 
     cols = [f"{s} / {m}" for s in sizes for m in MASKS]
     print()
-    print(f"CPU: {platform.processor()} | cores: {__import__('os').cpu_count()} | Python {platform.python_version()}")
+    cores = os.cpu_count()
+    print(f"CPU: {platform.processor()} | cores: {cores} | Python {platform.python_version()}")
     print()
     print("| Method | " + " | ".join(cols) + " |")
     print("|---|" + "---:|" * len(cols))
