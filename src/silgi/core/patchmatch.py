@@ -63,14 +63,14 @@ _K3 = np.uint64(0x165667B19E3779F9)
 # ----------------------------------------------------------------- numba kernels
 
 
-@njit(cache=True, inline="always")
+@njit(cache=True, nogil=True, inline="always")
 def _mix(z: np.uint64) -> np.uint64:  # pragma: no cover - compiled
     z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
     z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
     return z ^ (z >> np.uint64(31))
 
 
-@njit(cache=True, inline="always")
+@njit(cache=True, nogil=True, inline="always")
 def _ssd(img, py, px, qy, qx, r, cutoff):  # type: ignore[no-untyped-def]  # pragma: no cover
     c_n = img.shape[2]
     s = 0.0
@@ -84,7 +84,7 @@ def _ssd(img, py, px, qy, qx, r, cutoff):  # type: ignore[no-untyped-def]  # pra
     return s
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True, cache=True, nogil=True)
 def _compute_dist(img, ay, ax, nnf_y, nnf_x, dist, r):  # type: ignore[no-untyped-def]  # pragma: no cover
     for i in prange(ay.size):
         y = ay[i]
@@ -92,7 +92,7 @@ def _compute_dist(img, ay, ax, nnf_y, nnf_x, dist, r):  # type: ignore[no-untype
         dist[y, x] = _ssd(img, y, x, nnf_y[y, x], nnf_x[y, x], r, np.inf)
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True, cache=True, nogil=True)
 def _random_init(ay, ax, vy, vx, nnf_y, nnf_x, seed):  # type: ignore[no-untyped-def]  # pragma: no cover
     nv = np.uint64(vy.size)
     s = np.uint64(seed)
@@ -103,7 +103,7 @@ def _random_init(ay, ax, vy, vx, nnf_y, nnf_x, seed):  # type: ignore[no-untyped
         nnf_x[ay[i], ax[i]] = vx[j]
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True, cache=True, nogil=True)
 def _upsample_nnf(ay, ax, cy_nnf, cx_nnf, valid, vy, vx, nnf_y, nnf_x, seed):  # type: ignore[no-untyped-def]  # pragma: no cover
     hc, wc = cy_nnf.shape
     h, w = valid.shape
@@ -139,7 +139,7 @@ def _upsample_nnf(ay, ax, cy_nnf, cx_nnf, valid, vy, vx, nnf_y, nnf_x, seed):  #
         nnf_x[y, x] = bx
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True, cache=True, nogil=True)
 def _sweep(img, valid, ay, ax, nnf_y, nnf_x, dist, r, seed, max_radius):  # type: ignore[no-untyped-def]  # pragma: no cover
     """One PatchMatch half-sweep over pixels of a single parity."""
     h, w = valid.shape
@@ -199,7 +199,7 @@ def _sweep(img, valid, ay, ax, nnf_y, nnf_x, dist, r, seed, max_radius):  # type
         dist[y, x] = bd
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True, cache=True, nogil=True)
 def _vote(img, hy, hx, nnf_y, nnf_x, weight, r, out):  # type: ignore[no-untyped-def]  # pragma: no cover
     """Each hole pixel becomes the weighted mean of what overlapping patches propose."""
     h, w, c_n = img.shape
