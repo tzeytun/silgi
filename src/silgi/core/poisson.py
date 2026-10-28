@@ -13,6 +13,7 @@ outside Ω.
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 import numpy.typing as npt
 import scipy.sparse as sp
@@ -22,6 +23,37 @@ from ._types import BoolMask, FloatImage
 
 #: Above this many unknowns the sparse direct solver is replaced by CG.
 DIRECT_LIMIT = 250_000
+#: Coarse-to-fine initial guesses are only worthwhile for regions at least this big.
+MIN_COARSE_SIDE = 64
+
+
+def _resize(
+    a: npt.NDArray[np.float32], size: tuple[int, int], interp: int
+) -> npt.NDArray[np.float32]:
+    """cv2.resize that keeps a trailing channel axis."""
+    out = cv2.resize(a, size, interpolation=interp)
+    return np.asarray(out.reshape(size[1], size[0], -1), dtype=np.float32)
+
+
+def _coarse_start(
+    target: FloatImage, guide: FloatImage, mask: BoolMask, boundary_gradients: bool, factor: int = 4
+) -> FloatImage:
+    """Initial guess for the fine problem from a solve at 1/``factor`` resolution.
+
+    ``f - g`` is harmonic inside the mask, hence smooth: solving it on a coarse
+    grid and interpolating leaves only high-frequency error, which a few CG
+    iterations remove.
+    """
+    h, w, _ = target.shape
+    size = ((w + factor - 1) // factor, (h + factor - 1) // factor)
+    tc = _resize(target, size, cv2.INTER_AREA)
+    gc = _resize(guide, size, cv2.INTER_AREA)
+    mc = _resize(mask.astype(np.float32)[..., None], size, cv2.INTER_AREA)[..., 0] > 0.5
+    solved = blend(tc, gc, mc, boundary_gradients=boundary_gradients)
+    # correction field: solution minus guide inside, boundary data (target - guide) outside
+    corr = np.where(mc[..., None], solved - gc, tc - gc)
+    up = _resize(corr.astype(np.float32), (w, h), cv2.INTER_LINEAR)
+    return np.asarray(guide + up, dtype=np.float32)
 
 
 def blend(
@@ -93,9 +125,15 @@ def blend(
     else:
         pre = sp.diags(1.0 / diag)
         sol = np.empty((n, c), np.float64)
+        coarse = min(h, w) >= MIN_COARSE_SIDE
+        start = (
+            _coarse_start(target, guide, mask, boundary_gradients).astype(np.float64)
+            if coarse
+            else g
+        )
         for k in range(c):
-            x0 = g[ys, xs, k]
-            x, _ = spla.cg(a, b[:, k], x0=x0, rtol=1e-7, maxiter=4000, M=pre)
+            x0 = start[ys, xs, k]
+            x, _ = spla.cg(a, b[:, k], x0=x0, rtol=1e-7, maxiter=120 if coarse else 4000, M=pre)
             sol[:, k] = x
     out[ys, xs] = np.clip(sol, 0.0, 1.0).astype(np.float32)
     return out

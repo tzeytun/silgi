@@ -72,3 +72,16 @@ def test_finish_modes() -> None:
     assert np.array_equal(seamed[~m], t[~m])
     with pytest.raises(ValueError, match="seam"):
         blend.finish(t, f, m, seam_mode="bogus")  # type: ignore[arg-type]
+
+
+def test_two_level_solver_is_close_to_the_direct_solution(monkeypatch: pytest.MonkeyPatch) -> None:
+    t = scene("noise", 200, 240)
+    g = np.roll(t, 30, axis=1)
+    m = np.zeros((200, 240), bool)
+    m[40:160, 50:190] = True
+    direct = poisson.blend(t, g, m)
+    monkeypatch.setattr(poisson, "DIRECT_LIMIT", 0)
+    two_level = poisson.blend(t, g, m)
+    assert np.array_equal(two_level[~m], t[~m])
+    assert np.abs(two_level - direct).mean() < 2e-3
+    assert np.abs(two_level - direct).max() < 0.05
