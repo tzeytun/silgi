@@ -35,6 +35,7 @@ class Version:
     method: str = "original"
     reason: str = ""
     mask_png: bytes | None = None
+    mask_offset: tuple[int, int] = (0, 0)
 
 
 @dataclass
@@ -122,6 +123,7 @@ class Document:
         method: str,
         reason: str,
         mask_png: bytes | None,
+        mask_offset: tuple[int, int] = (0, 0),
     ) -> Version:
         y0, y1, x0, x1 = box
         with self.lock:
@@ -134,6 +136,7 @@ class Document:
                 method=method,
                 reason=reason,
                 mask_png=mask_png,
+                mask_offset=mask_offset,
             )
             self.versions[vid] = v
             self._remember(self._pixels, vid, result)

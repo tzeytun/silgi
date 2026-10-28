@@ -20,6 +20,8 @@ class RemoveOptions(BaseModel):
     seed: int = 0
     feather: float = Field(0.0, ge=0, le=64)
     seam: Literal["none", "poisson"] = "none"
+    mask_offset: tuple[int, int] = (0, 0)
+    source_offset: tuple[int, int] = (0, 0)
 
 
 class WandRequest(BaseModel):
