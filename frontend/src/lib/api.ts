@@ -251,10 +251,19 @@ export function watchJob(
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(`${proto}://${location.host}/api/jobs/${jobId}/events`)
     let finished = false
+    // The socket only delivers live progress. Whatever ends it, the final state comes
+    // from the job itself, polled until it is really over.
     const finish = () => {
       if (finished) return
       finished = true
-      api.job(jobId).then(resolve, reject)
+      const poll = async () => {
+        for (;;) {
+          const snap = await api.job(jobId)
+          if (snap.status !== 'queued' && snap.status !== 'running') return snap
+          await new Promise((r) => setTimeout(r, 250))
+        }
+      }
+      poll().then(resolve, reject)
     }
     ws.onmessage = (m) => {
       const ev = JSON.parse(m.data) as JobEvent

@@ -41,6 +41,7 @@ dependencies = [
   "tifffile>=2024.1.30",
   "fastapi>=0.110",
   "uvicorn>=0.29",
+  "websockets>=12",
   "python-multipart>=0.0.9",
 ]
 
