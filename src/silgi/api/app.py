@@ -54,12 +54,27 @@ _EXT = {"png": "png", "jpeg": "jpg", "webp": "webp", "tiff": "tif"}
 _MIME = {"png": "image/png", "jpeg": "image/jpeg", "webp": "image/webp", "tiff": "image/tiff"}
 
 
-def _png(mask: npt.NDArray[Any]) -> Response:
-    return Response(mask_to_png(mask), media_type="image/png")
+def _mask_response(mask: npt.NDArray[Any], headers: dict[str, str] | None = None) -> Response:
+    """Send only the mask's bounding box; ``X-Silgi-Offset`` says where it goes."""
+    hard = mask > 0
+    box = mask_bbox(hard)
+    if box is None:
+        crop, x, y = np.zeros((1, 1), bool), 0, 0
+    else:
+        y0, y1, x0, x1 = box
+        crop, x, y = mask[y0:y1, x0:x1], x0, y0
+    h = {"X-Silgi-Offset": f"{x},{y}", "Access-Control-Expose-Headers": "X-Silgi-Offset"}
+    h.update(headers or {})
+    return Response(mask_to_png(crop), media_type="image/png", headers=h)
 
 
-def _decode_mask(data: bytes, shape: tuple[int, int]) -> npt.NDArray[np.uint8]:
-    """Read an 8-bit grayscale (or RGBA alpha) mask PNG as soft weights 0..255."""
+def _decode_mask(
+    data: bytes, shape: tuple[int, int], offset: tuple[int, int] = (0, 0)
+) -> npt.NDArray[np.uint8]:
+    """Read an 8-bit grayscale (or RGBA alpha) mask PNG as soft weights 0..255.
+
+    The PNG may cover only part of the image; ``offset`` = (x, y) places it.
+    """
     try:
         pil = PILImage.open(io.BytesIO(data))
         if pil.mode in ("RGBA", "LA"):
@@ -68,11 +83,17 @@ def _decode_mask(data: bytes, shape: tuple[int, int]) -> npt.NDArray[np.uint8]:
             arr = np.asarray(pil.convert("L"))
     except OSError as exc:
         raise HTTPException(400, f"mask is not a valid image: {exc}") from exc
-    if arr.shape != shape:
+    x, y = offset
+    mh, mw = arr.shape
+    if arr.shape == shape and offset == (0, 0):
+        return np.ascontiguousarray(arr, dtype=np.uint8)
+    if x < 0 or y < 0 or y + mh > shape[0] or x + mw > shape[1]:
         raise HTTPException(
-            400, f"mask is {arr.shape[1]}x{arr.shape[0]}, image is {shape[1]}x{shape[0]}"
+            400, f"mask ({mw}x{mh} at {x},{y}) does not fit the {shape[1]}x{shape[0]} image"
         )
-    return np.ascontiguousarray(arr, dtype=np.uint8)
+    full = np.zeros(shape, np.uint8)
+    full[y : y + mh, x : x + mw] = arr
+    return full
 
 
 def create_app() -> FastAPI:
@@ -192,7 +213,15 @@ def create_app() -> FastAPI:
         v = doc.versions[version_or_404(doc, version)]
         if v.mask_png is None:
             raise HTTPException(404, "this version has no mask")
-        return Response(v.mask_png, media_type="image/png")
+        x, y = v.mask_offset
+        return Response(
+            v.mask_png,
+            media_type="image/png",
+            headers={
+                "X-Silgi-Offset": f"{x},{y}",
+                "Access-Control-Expose-Headers": "X-Silgi-Offset",
+            },
+        )
 
     # ------------------------------------------------------------------ selection
 
@@ -206,7 +235,7 @@ def create_app() -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        return _png(mask)
+        return _mask_response(mask)
 
     @app.post("/api/images/{doc_id}/select/color-range")
     async def colorrange(doc_id: str, req: ColorRangeRequest) -> Response:
@@ -221,9 +250,7 @@ def create_app() -> FastAPI:
         else:
             raise HTTPException(400, "give a colour or a point")
         mask = await run_in_threadpool(color_range, px, color, req.tolerance)
-        return Response(
-            mask_to_png(mask), media_type="image/png", headers={"X-Silgi-Color": json.dumps(color)}
-        )
+        return _mask_response(mask, {"X-Silgi-Color": json.dumps(color)})
 
     @app.post("/api/images/{doc_id}/select/text")
     async def text(doc_id: str, req: TextRequest) -> dict[str, Any]:
@@ -339,8 +366,12 @@ def create_app() -> FastAPI:
         version_or_404(doc, opts.version)
         shape = (doc.source.height, doc.source.width)
         mask_bytes = await mask.read() if mask is not None else None
-        m = _decode_mask(mask_bytes, shape) if mask_bytes else None
-        src_m = _decode_mask(await source_mask.read(), shape) if source_mask is not None else None
+        m = _decode_mask(mask_bytes, shape, opts.mask_offset) if mask_bytes else None
+        src_m = (
+            _decode_mask(await source_mask.read(), shape, opts.source_offset)
+            if source_mask is not None
+            else None
+        )
         watermark = None
         if opts.watermark_id is not None:
             watermark = store.watermarks.get(opts.watermark_id)
@@ -393,7 +424,13 @@ def create_app() -> FastAPI:
                     "changed": False,
                 }
             v = doc.add_version(
-                opts.version, result_img, box, method=method, reason=reason, mask_png=mask_bytes
+                opts.version,
+                result_img,
+                box,
+                method=method,
+                reason=reason,
+                mask_png=mask_bytes,
+                mask_offset=opts.mask_offset,
             )
             return {
                 "version": v.id,

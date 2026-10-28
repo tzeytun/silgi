@@ -44,6 +44,15 @@ def _wait(client: TestClient, job_id: str, timeout: float = 60) -> dict[str, Any
     raise AssertionError("job did not finish")
 
 
+def _mask_from(r: Any, shape: tuple[int, int]) -> np.ndarray:
+    """Rebuild a full-size mask from a cropped mask response."""
+    x, y = (int(v) for v in r.headers["x-silgi-offset"].split(","))
+    crop = read_image(r.content).pixels > 0
+    full = np.zeros(shape, bool)
+    full[y : y + crop.shape[0], x : x + crop.shape[1]] = crop
+    return full
+
+
 def _remove(
     client: TestClient, doc_id: str, mask: np.ndarray | None, **options: Any
 ) -> dict[str, Any]:
@@ -108,7 +117,9 @@ def test_remove_job_untouched_and_export(client: TestClient) -> None:
 
     info = client.get(f"/api/images/{doc}").json()
     assert [v["id"] for v in info["versions"]] == [0, 1]
-    assert client.get(f"/api/images/{doc}/v/1/mask.png").status_code == 200
+    vm = client.get(f"/api/images/{doc}/v/1/mask.png")
+    assert vm.status_code == 200
+    assert vm.headers["x-silgi-offset"] == "0,0"
     assert client.get(f"/api/images/{doc}/v/0/mask.png").status_code == 404
     assert client.get(f"/api/images/{doc}/v/1/tiles/0/0/0.webp").status_code == 200
 
@@ -185,7 +196,12 @@ def test_remove_errors(client: TestClient) -> None:
     empty = {"mask": ("m.png", mask_to_png(np.zeros((20, 30), bool)), "image/png")}
     assert client.post(f"/api/images/{doc}/remove", files=empty).status_code == 400
     wrong = {"mask": ("m.png", mask_to_png(np.ones((5, 5), bool)), "image/png")}
-    assert client.post(f"/api/images/{doc}/remove", files=wrong).status_code == 400
+    far = json.dumps({"method": "telea", "mask_offset": [28, 0]})
+    r = client.post(f"/api/images/{doc}/remove", data={"options": far}, files=wrong)
+    assert r.status_code == 400
+    near = json.dumps({"method": "telea", "mask_offset": [3, 4]})
+    placed = client.post(f"/api/images/{doc}/remove", data={"options": near}, files=wrong)
+    assert _wait(client, placed.json()["job_id"])["status"] == "done"
     bad = {"mask": ("m.png", b"nope", "image/png")}
     assert client.post(f"/api/images/{doc}/remove", files=bad).status_code == 400
     full = {"mask": ("m.png", mask_to_png(np.ones((20, 30), bool)), "image/png")}
@@ -273,17 +289,22 @@ def test_selection_endpoints(client: TestClient) -> None:
     img[:, 40:] = (250, 250, 250)
     doc = _upload(client, img)["id"]
     r = client.post(f"/api/images/{doc}/select/wand", json={"x": 50, "y": 10})
-    m = read_image(r.content).pixels > 0
+    m = _mask_from(r, (60, 80))
     assert m[:, 40:].all()
     assert not m[:, :40].any()
     assert (
         client.post(f"/api/images/{doc}/select/wand", json={"x": 500, "y": 10}).status_code == 400
     )
     r = client.post(f"/api/images/{doc}/select/color-range", json={"x": 60, "y": 5, "tolerance": 5})
-    assert (read_image(r.content).pixels > 0)[:, 40:].all()
+    assert _mask_from(r, (60, 80))[:, 40:].all()
     assert json.loads(r.headers["x-silgi-color"])[0] > 0.9
     r = client.post(f"/api/images/{doc}/select/color-range", json={"color": [0, 0, 0]})
-    assert (read_image(r.content).pixels > 0)[:, :40].all()
+    assert _mask_from(r, (60, 80))[:, :40].all()
+    r = client.post(
+        f"/api/images/{doc}/select/color-range", json={"color": [1, 0, 0], "tolerance": 1}
+    )
+    assert r.headers["x-silgi-offset"] == "0,0"
+    assert not _mask_from(r, (60, 80)).any()
     assert client.post(f"/api/images/{doc}/select/color-range", json={}).status_code == 400
     assert (
         client.post(f"/api/images/{doc}/select/color-range", json={"x": 999, "y": 0}).status_code
