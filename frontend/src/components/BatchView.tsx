@@ -160,12 +160,12 @@ export function BatchView() {
                 className="overflow-hidden rounded-lg border border-line bg-panel"
                 data-testid="batch-item"
               >
-                <div className="checker grid h-36 place-items-center">
+                <div className="checker grid h-36 place-items-center overflow-hidden">
                   {b.doc && (
                     <img
                       src={previewUrl(b.doc.id, b.status === 'done' ? b.version : 0, 320)}
                       alt={b.name}
-                      className="max-h-full max-w-full object-contain"
+                      className="max-h-36 max-w-full object-contain"
                     />
                   )}
                 </div>
