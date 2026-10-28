@@ -71,10 +71,8 @@ Changelog = "https://github.com/tzeytun/silgi/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/silgi"]
-
-# The built frontend is git-ignored, so it must be forced into the wheel.
-[tool.hatch.build.targets.wheel.force-include]
-"src/silgi/web" = "silgi/web"
+# the built frontend is git-ignored; this ships it anyway
+artifacts = ["src/silgi/web/**"]
 
 [tool.hatch.build.targets.sdist]
 artifacts = ["src/silgi/web/**"]
