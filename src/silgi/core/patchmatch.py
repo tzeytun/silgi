@@ -364,9 +364,9 @@ def fill(
 
     # coarsest initialisation by diffusion
     top = levels[-1]
+    img = diffusion.fill(top.img, top.hole, method="telea", radius=3.0)
     nnf_y: npt.NDArray[np.int32] = np.full(top.hole.shape, -1, np.int32)
     nnf_x: npt.NDArray[np.int32] = np.full(top.hole.shape, -1, np.int32)
-    nnf_x = np.full(top.hole.shape, -1, np.int32)
 
     for li in range(n_levels - 1, -1, -1):
         lv = levels[li]
