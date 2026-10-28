@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea (Discussions)
+    url: https://github.com/tzeytun/silgi/discussions
+    about: Ask a question or share what you built with silgi.
+  - name: Report a security problem
+    url: https://github.com/tzeytun/silgi/security/advisories/new
+    about: Please report vulnerabilities privately.

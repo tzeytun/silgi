@@ -184,7 +184,7 @@ def icon_svg(rounded: bool = True) -> str:
     m = wordmark(("dotlessi",))
     em = m.upm
     size = 512.0
-    (dx, dy), = m.dots
+    ((dx, dy),) = m.dots
     glyph_top = dy + RING_D * em / 2
     glyph_h = glyph_top - m.ymin
     scale = size * 0.62 / glyph_h
@@ -192,9 +192,8 @@ def icon_svg(rounded: bool = True) -> str:
     tx = size / 2 - cx * scale
     ty = size / 2 + (glyph_top + m.ymin) / 2 * scale
     radius = size * 0.22 if rounded else 0
-    inner = (
-        f'<path fill="{WHITE}" d="{m.path}"/>'
-        + _dashed_ring(dx, -dy, RING_D * em * 1.15, RING_STROKE * em * 1.25, PINK)
+    inner = f'<path fill="{WHITE}" d="{m.path}"/>' + _dashed_ring(
+        dx, -dy, RING_D * em * 1.15, RING_STROKE * em * 1.25, PINK
     )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" '

@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build wheel and sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the frontend into the package
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check the tag matches the package version
+        run: |
+          python - <<'PY'
+          import os, re, pathlib
+          version = re.search(r'__version__ = "([^"]+)"', pathlib.Path("src/silgi/__init__.py").read_text()).group(1)
+          tag = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          assert version == tag, f"tag {tag} does not match package version {version}"
+          PY
+      - name: Build
+        run: |
+          python -m pip install build
+          python -m build
+      - name: The wheel must ship the web interface
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          assert any(n.endswith("silgi/web/index.html") for n in names), "web/index.html missing from wheel"
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  github-release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+
+  pypi:
+    name: Publish to PyPI (trusted publishing)
+    needs: build
+    # Opt in by setting the repository variable PUBLISH_TO_PYPI to "true" and
+    # configuring a trusted publisher for this workflow on pypi.org.
+    if: vars.PUBLISH_TO_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
